@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exhibition Bolt-on Targets Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; color: #1f2937; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            height: 400px;
+            max-height: 500px;
+        }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 600; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; }
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Modal Animation */
+        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
+        .modal-content-enter { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    </style>
+    <!-- Chosen Palette: Warm Professional (Slate/Blue/Warm Gray) -->
+    <!-- Application Structure Plan: 
+         1. Dashboard: Key metrics and Plotly Value Matrix (Scatter Plot).
+         2. Sector Deep Dive: Thematic grouping of key targets with summary cards. Clicking opens a detailed modal.
+         3. Modal: In-depth qualitative data (Themes, Categories, Business Model).
+         4. Comparative Analysis: Chart.js Bar chart for direct USD revenue comparison.
+    -->
+    <!-- Visualization & Content Choices:
+         - Scatter Plot (Plotly): Visualizes relationships between scale (visitors/area/exhibitors) and revenue potential.
+         - Interactive Cards & Modal (Tailwind+JS): Cleanly displays Operator and underlying logic without clutter.
+         - Bar Chart (Chart.js): Straightforward ranking of revenue.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+    <!-- Navigation / Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">PE</div>
+                <h1 class="text-xl font-bold text-gray-900 tracking-tight">Exhibition Bolt-on Targets Dashboard</h1>
+            </div>
+            <nav class="flex space-x-4">
+                <button onclick="scrollToSection('dashboard')" class="text-sm font-medium hover:text-blue-600">Market Overview</button>
+                <button onclick="scrollToSection('sectors')" class="text-sm font-medium hover:text-blue-600">Sectors & Targets</button>
+                <button onclick="scrollToSection('comparison')" class="text-sm font-medium hover:text-blue-600">Revenue Comparison</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- Section 1: Introduction & Investment Thesis -->
+        <section class="mb-12">
+            <div class="bg-white rounded-xl card-shadow p-6 border-l-4 border-blue-600">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Investment Thesis</h2>
+                <p class="text-gray-600 leading-relaxed">
+                    We are screening for high-growth, high-ARPU, and strong-community vertical exhibition assets in the Chinese market. 
+                    These category-leading exhibitions feature excellent cash flow and strong anti-cyclical capabilities, making them perfect <strong>Bolt-on acquisition targets</strong> for our platform.
+                    <br><br>
+                    <strong>Screening Scope:</strong> Strictly excluding State-Owned Enterprises (SOE), focusing on high-net-worth commercial assets operated by private enterprises, foreign capital, or listed giants. All financial data is estimated and converted to <strong>USD</strong>.
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 2: Dashboard Metrics & Scatter Plot -->
+        <section id="dashboard" class="mb-12">
+            <div class="mb-6">
+                <h3 class="text-xl font-bold text-gray-900">Market Overview</h3>
+                <p class="text-sm text-gray-500">Multi-dimensional visual evaluation of high-value targets based on scale metrics and estimated revenue (Million USD).</p>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-lg border border-gray-100 card-shadow">
+                    <p class="text-xs text-gray-400 uppercase font-semibold">Total Targets Tracked</p>
+                    <p class="text-3xl font-bold text-gray-800" id="totalTargets">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-gray-100 card-shadow">
+                    <p class="text-xs text-gray-400 uppercase font-semibold">Est. Total Revenue Pool</p>
+                    <p class="text-3xl font-bold text-blue-600" id="totalRevenue">$0 M</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-gray-100 card-shadow">
+                    <p class="text-xs text-gray-400 uppercase font-semibold">Total Visitor Reach</p>
+                    <p class="text-3xl font-bold text-emerald-600" id="totalVisitors">0 M</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg border border-gray-100 card-shadow">
+                    <p class="text-xs text-gray-400 uppercase font-semibold">Avg. Revenue / Target</p>
+                    <p class="text-3xl font-bold text-purple-600" id="avgRevenue">$0 M</p>
+                </div>
+            </div>
+
+            <!-- Plotly Scatter Plot -->
+            <div class="bg-white p-6 rounded-xl card-shadow">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700">Value Matrix</h4>
+                        <p class="text-xs text-gray-400 mt-1">Bubble size = Exhibition Area (sqm). Hover over bubbles for details.</p>
+                    </div>
+                    <!-- Axis Toggles -->
+                    <div class="mt-4 sm:mt-0 flex items-center gap-4 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                        <span class="text-sm font-semibold text-gray-700">X-Axis:</span>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="xaxis" value="visitors" checked class="text-blue-600 form-radio" onchange="updateScatterPlot()">
+                            <span class="ml-2 text-sm text-gray-600">Visitors</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="xaxis" value="area" class="text-blue-600 form-radio" onchange="updateScatterPlot()">
+                            <span class="ml-2 text-sm text-gray-600">Area</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="xaxis" value="exhibitors" class="text-blue-600 form-radio" onchange="updateScatterPlot()">
+                            <span class="ml-2 text-sm text-gray-600">Exhibitors</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="scatterPlot" class="w-full h-[500px]"></div>
+            </div>
+        </section>
+
+        <!-- Section 3: Sector Deep Dive -->
+        <section id="sectors" class="mb-12">
+            <div class="mb-6">
+                <h3 class="text-xl font-bold text-gray-900">Sector Deep Dive</h3>
+                <p class="text-sm text-gray-500">Categorized by vertical industry. Click on a card to view detailed themes and exhibition categories.</p>
+            </div>
+
+            <!-- Sector Tabs -->
+            <div class="flex flex-wrap border-b border-gray-200 mb-6 gap-x-6 gap-y-2" id="sectorTabs">
+                <!-- Tabs injected by JS -->
+            </div>
+
+            <!-- Dynamic Content Area -->
+            <div id="sectorContent" class="min-h-[400px]">
+                <!-- Content injected by JS -->
+            </div>
+        </section>
+
+        <!-- Section 4: Comparative Analysis -->
+        <section id="comparison" class="mb-12">
+            <div class="bg-white p-6 rounded-xl card-shadow">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">Top Revenue Rankings (USD Millions)</h3>
+                        <p class="text-sm text-gray-500">Horizontal comparison of single-show revenue generation capabilities across core targets.</p>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Detail Modal -->
+    <div id="targetModal" class="fixed inset-0 bg-black/60 z-[100] hidden items-center justify-center p-4">
+        <div id="modalContent" class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+            
+            <!-- Modal Header -->
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900" id="modalName">Exhibition Name</h2>
+                    <p class="text-sm font-semibold text-blue-600 mt-1" id="modalSubSector">Industry</p>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none font-bold outline-none">&times;</button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6">
+                <!-- Quick Stats Row -->
+                <div class="flex flex-wrap gap-3 mb-6">
+                    <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold" id="modalOperator"></span>
+                    <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-semibold" id="modalCapital"></span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <!-- Left Column: Data & Financials -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Scale & Financials</h4>
+                        
+                        <div class="bg-blue-50/50 rounded-lg p-4 border border-blue-100 mb-4">
+                            <p class="text-xs text-gray-500 font-semibold mb-1">Est. Single-Show Revenue (USD)</p>
+                            <p class="text-2xl font-bold text-blue-700" id="modalRevMean"></p>
+                            <p class="text-xs text-gray-500 mt-1" id="modalRevRange"></p>
+                        </div>
+
+                        <div class="space-y-3 text-sm text-gray-700">
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="text-gray-500">Area:</span>
+                                <span class="font-bold" id="modalArea"></span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="text-gray-500">Visitors:</span>
+                                <span class="font-bold" id="modalVisitors"></span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="text-gray-500">Exhibitors:</span>
+                                <span class="font-bold" id="modalExhibitors"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Qualitative Info -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Theme & Business Model</h4>
+                        
+                        <div class="mb-4">
+                            <h5 class="text-xs font-bold text-gray-800 mb-1">🎯 核心主题 (Core Theme)</h5>
+                            <p class="text-sm text-gray-600 leading-relaxed" id="modalTheme"></p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="text-xs font-bold text-gray-800 mb-1">🛍️ 参展品类 (Categories)</h5>
+                            <p class="text-sm text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 leading-relaxed" id="modalCategories"></p>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-xs font-bold text-gray-800 mb-1">💰 商业变现模式 (Monetization Model)</h5>
+                            <p class="text-sm text-gray-600 leading-relaxed" id="modalModel"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-gray-400 text-xs">This report is for PE Investment Committee (IC) review. Financial data is based on public market info and industry ARPU models (1 USD ≈ 7.1 RMB).</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- DATA STORE ---
+        const targets = [
+            // 1. Pan-ACG
+            {
+                id: 'cj', name: 'ChinaJoy (CJ展)', sector: 'Pan-ACG', subSector: '数码与重度游戏',
+                operator: '汉威信恒 (顺网科技)', capital: '上市巨头控股',
+                revMean: 35.2, revRange: '$28M - $42M',
+                area: 165000, exhibitors: 500, visitors: 300000,
+                theme: '数字多巴胺与全球泛娱乐产业高地。',
+                categories: '腾讯、网易、索尼等头部游戏大厂最新大作；高端电竞硬件设备；动漫手办周边；数字娱乐前沿软硬件。',
+                model: '游戏巨头天价特装 B2B + 庞大 C 端高溢价门票。', color: '#ef4444' 
+            },
+            {
+                id: 'cp', name: 'Comicup (CP展)', sector: 'Pan-ACG', subSector: '同人文化与二次元',
+                operator: '上海摩都文化传播', capital: '独立民营企业',
+                revMean: 17.6, revRange: '$14M - $21M',
+                area: 175000, exhibitors: 1000, visitors: 300000,
+                theme: '国内二次元地下与地上文化交汇的绝对垄断流量节点。',
+                categories: '海量IP同人本、二次元官方及民间周边（谷子）、Cosplay服饰、头部游戏/动漫大厂官方重金特装宣发。',
+                model: '国内二次元绝对垄断流量 + C端极高溢价门票与周边抽成。', color: '#ef4444'
+            },
+            {
+                id: 'cicf', name: 'CICF EXPO (动漫游戏展)', sector: 'Pan-ACG', subSector: '泛ACG与游戏',
+                operator: '广州酷展文化 (漫友系)', capital: '民营企业',
+                revMean: 10.6, revRange: '$8.5M - $12.7M',
+                area: 70000, exhibitors: 300, visitors: 250000,
+                theme: '华南地区规模最大的 ACGN 狂欢节。',
+                categories: '头部游戏厂商（依托腾讯/网易华南大本营）游戏体验区、知名声优签售、模型玩具、国漫及日漫正版衍生品。',
+                model: '吃透华南游戏大厂宣发预算 + 巨量下沉粉丝门票。', color: '#ef4444'
+            },
+            {
+                id: 'wf', name: 'Wonder Festival (WF上海)', sector: 'Pan-ACG', subSector: '手办模型与潮玩',
+                operator: '引能(上海) / 维度玩具', capital: '民营 (代理日本IP)',
+                revMean: 9.2, revRange: '$7M - $11.3M',
+                area: 60000, exhibitors: 300, visitors: 65000,
+                theme: '硬核收集癖与“塑料成瘾”的顶级盛会。',
+                categories: '硬核手办模型、GK树脂套件、知名原型师个人限量作品、大型潮玩盲盒品牌发售。',
+                model: '硬核玩家千元级 VIP 门票 + 品牌大面积光地 + 限量品发售抽佣。', color: '#ef4444'
+            },
+            {
+                id: 'weplay', name: 'WePlay 文化展', sector: 'Pan-ACG', subSector: '独立游戏与硬核单机',
+                operator: '深圳市西雅客文化 (CiGA)', capital: '民营企业',
+                revMean: 5.6, revRange: '$4.2M - $7M',
+                area: 25000, exhibitors: 300, visitors: 40000,
+                theme: '中国本土硬核玩家与独立游戏开发者的“圣地”。',
+                categories: '独立游戏试玩、3A单机大作体验、硬核实体桌游(Board Games)、高端外设与显卡硬件赞助展示。',
+                model: 'B2B 游戏发行商/硬件商赞助及展位费 + 高粘性社区门票。', color: '#ef4444'
+            },
+            // 2. Outdoor
+            {
+                id: 'ispo', name: 'ISPO Beijing/Shanghai', sector: 'Outdoor', subSector: '高端运动与户外',
+                operator: '德国慕尼黑展览', capital: '外资巨头控股',
+                revMean: 17.6, revRange: '$14M - $21M',
+                area: 90000, exhibitors: 800, visitors: 80000,
+                theme: '国际一线户外运动品牌亚太区首发核心阵地。',
+                categories: '始祖鸟/萨洛蒙等顶级品牌首发、滑雪硬装备、高海拔攀登器材、功能性科技面料供应链。',
+                model: '锁死高端户外品牌首发权，赚取国际标准超高 B2B 特装费。', color: '#22c55e'
+            },
+            {
+                id: 'aic', name: 'AIC 国际房车露营展', sector: 'Outdoor', subSector: '重装越野与房车',
+                operator: '21世纪房车网', capital: '民营企业',
+                revMean: 14.1, revRange: '$11.3M - $16.9M',
+                area: 110000, exhibitors: 500, visitors: 125000,
+                theme: '中老年高净值人群的“顶级重工大玩具”交易场。',
+                categories: '豪华越野房车、拖挂式底盘、房车重型改装配件、户外发电设备。现场单笔交易额动辄百万。',
+                model: '重资产现场交易 + 海量特大面积光地展位费 + 社群运营。', color: '#22c55e'
+            },
+            {
+                id: 'cosp', name: 'COSP 国际户外展', sector: 'Outdoor', subSector: '精致露营与泛户外',
+                operator: '灵硕展览集团', capital: '民营展览集团',
+                revMean: 9.2, revRange: '$7M - $11.3M',
+                area: 65000, exhibitors: 600, visitors: 70000,
+                theme: '中产阶级“逃离都市成瘾”的装备盲盒。',
+                categories: '精致露营(Glamping)重型金字塔帐篷、天幕、户外咖啡器具、求生刀具及轻量化户外服饰。',
+                model: '国内外户外大厂 B2B 重金特装 + B2C 现场狂热采购。', color: '#22c55e'
+            },
+            {
+                id: 'lure', name: '天津/威海路亚渔具展', sector: 'Outdoor', subSector: '路亚海钓与渔具',
+                operator: '天津企阳 等', capital: '传统民营会展',
+                revMean: 7.7, revRange: '$5.6M - $9.9M',
+                area: 65000, exhibitors: 500, visitors: 90000,
+                theme: '中年男性的专属多巴胺与无底洞装备攀比。',
+                categories: '路亚海钓装备、万元级碳纤维高端鱼竿、顶级拟饵、专业户外水上船只及马达。',
+                model: '极大的内外贸 B2B 批发订单撮合 + C端“土豪”疯狂扫货。', color: '#22c55e'
+            },
+            // 3. Pet
+            {
+                id: 'pfa', name: 'Pet Fair Asia (亚宠展)', sector: 'Pet Economy', subSector: '宠物全产业链',
+                operator: '上海万耀企龙', capital: '安宏资本 (PE控股)',
+                revMean: 31.0, revRange: '> $28M',
+                area: 300000, exhibitors: 2000, visitors: 300000,
+                theme: '抗经济周期的“情感陪伴消费”终极形态。',
+                categories: '涵盖宠物食品（主粮/零食）、顶级宠物医疗器械、高端活体展示、宠物智能穿戴全产业链。',
+                model: '包揽上海最大展馆全馆，B2B 经销商大会与 B2C 周末扫货双高峰。', color: '#eab308' 
+            },
+            {
+                id: 'shenpet', name: '深宠展 (深圳宠物展)', sector: 'Pet Economy', subSector: '跨境电商与宠物供应链',
+                operator: '深圳鹏城展览', capital: '民营企业',
+                revMean: 7.0, revRange: '$5.6M - $8.5M',
+                area: 70000, exhibitors: 800, visitors: 100000,
+                theme: '把控华南宠物用品跨境与内销电商核心供应链。',
+                categories: '宠物电商爆款产品、OEM/ODM源头代工厂、智能猫砂盆等电子宠物用品、外贸出口撮合。',
+                model: '聚焦跨境卖家与内销电商平台的 B2B 选品大会。', color: '#eab308'
+            },
+            {
+                id: 'jingpet', name: '京宠展 (北京宠物展)', sector: 'Pet Economy', subSector: '高净值医疗与活体',
+                operator: '北京雄鹰国际展览', capital: '民营企业',
+                revMean: 9.9, revRange: '$8.5M - $11.3M',
+                area: 110000, exhibitors: 1200, visitors: 175000,
+                theme: '占据中国北方高端宠物医疗与消费绝对核心。',
+                categories: '高端宠物处方粮、大型连锁宠物医院/医疗设备、繁育级纯种活体宠物展示交易。',
+                model: '利用北方巨大的消费基盘赚取海量展位费与C端门票。', color: '#eab308'
+            },
+            // 4. Dental
+            {
+                id: 'sino-dental', name: 'Sino-Dental (北京口腔展)', sector: 'Dental', subSector: '口腔设备与材料',
+                operator: '国合中心 / 官方机构', capital: '官方/国资背景',
+                revMean: 20.5, revRange: '$18M - $23M',
+                area: 50000, exhibitors: 900, visitors: 128936,
+                theme: '北方最大规模、最具学术权威性的国际口腔盛会。',
+                categories: '口腔种植耗材、正畸产品、齿科3D打印、全科室临床器械及先进医疗设备。',
+                model: '超强学术背书带动极高规格的特装展位销售及B2B采购。', color: '#0ea5e9'
+            },
+            {
+                id: 'dsc', name: 'Dental South China (华南口腔展)', sector: 'Dental', subSector: '口腔全产业链',
+                operator: '广东科展国际展览', capital: '民营/股份制',
+                revMean: 24.5, revRange: '$21M - $28M',
+                area: 82000, exhibitors: 1150, visitors: 72502,
+                theme: '深耕华南、辐射亚洲的国际性牙科设备与技术风向标。',
+                categories: '牙体牙髓、牙周、种植、正畸、修复等全科室医疗器械及耗材；义齿加工设备。',
+                model: '极高的 B2B 现场采购转化率 + 诊所管理者/牙医的高粘性复购。', color: '#0ea5e9'
+            },
+            {
+                id: 'dentech', name: 'DenTech China (上海口腔展)', sector: 'Dental', subSector: '口腔器材与齿科',
+                operator: '上海博星展览 / 英富曼 (Informa)', capital: '中外合资/外资控股',
+                revMean: 21.5, revRange: '$18M - $25M',
+                area: 50000, exhibitors: 850, visitors: 115000,
+                theme: '集学术交流、科技创新、临床应用于一体的综合性口腔医疗盛会。',
+                categories: '口腔种植、隐形正畸、数字齿科全产业链、口腔影像设备及牙椅。',
+                model: '全球顶尖齿科品牌大面积特装 + 同期数十场高规格学术/继续教育会议。', color: '#0ea5e9'
+            },
+            {
+                id: 'west-dental', name: '成都西部口腔展', sector: 'Dental', subSector: '西部齿科与器械',
+                operator: '湖北好博 / 行业协会', capital: '民营展览/协会',
+                revMean: 15.5, revRange: '$13M - $18M',
+                area: 60000, exhibitors: 685, visitors: 50000,
+                theme: '中西部地区规模最大的口腔医疗全产业链采购平台。',
+                categories: '覆盖中西部牙科诊所的数字化口腔设备、基础耗材、牙科诊室空间设计方案。',
+                model: '渠道下沉与区域性 B2B 经销商大会深度绑定。', color: '#0ea5e9'
+            },
+            {
+                id: 'sdhe', name: 'SDHE (深圳口腔高新展)', sector: 'Dental', subSector: '口腔医学高新技术',
+                operator: '深圳会展机构', capital: '民营企业',
+                revMean: 8.5, revRange: '$6M - $11M',
+                area: 30000, exhibitors: 600, visitors: 21600,
+                theme: '依托深圳硬件硅谷的数字化与高新技术齿科展。',
+                categories: '齿科新材料研发、口腔医疗AI软件系统、数字化种植及正畸创新硬件。',
+                model: '前沿医疗技术首发 + 珠三角创新医疗器械供应链撮合。', color: '#0ea5e9'
+            },
+            // 5. Adult
+            {
+                id: 'api', name: 'API Expo (情趣生活展)', sector: 'Adult Health', subSector: '情趣潮玩与泛健康',
+                operator: '上海赛菲会展服务', capital: '轻资产民营',
+                revMean: 2.3, revRange: '$2M - $2.5M',
+                area: 16000, exhibitors: 400, visitors: 60000,
+                theme: '情趣去污名化与Z世代荷尔蒙品牌破圈。',
+                categories: 'AI智能伴侣、女性向高颜值情趣潮牌、元宇宙互动硬件、泛两性健康及私密护理生活方式产品。',
+                model: '极高单坪坪效：新锐品牌高溢价展位租赁 + 年轻人破圈打卡的高流量门票。', color: '#a855f7'
+            },
+            {
+                id: 'szi', name: 'SZI Expo (成人出海展)', sector: 'Adult Health', subSector: '硬核代工与跨境出海',
+                operator: '福建豪裕集团', capital: '中型民营财团',
+                revMean: 3.9, revRange: '$3.5M - $4.2M',
+                area: 40000, exhibitors: 400, visitors: 60000,
+                theme: '吃透珠三角硅胶与AI硬件底层代工产能的全球出海枢纽。',
+                categories: '专供亚马逊/独立站的情趣爆款、硅胶/TPE开模定制大厂、微电机马达配件、实体娃娃源头工厂。',
+                model: '纯 B2B 重型特装大面积光地租赁 + 跨境出海晚宴/选品对接高净值赞助。', color: '#a855f7'
+            },
+            {
+                id: 'gzsex', name: '广州性文化节', sector: 'Adult Health', subSector: '下沉大卖场与科普',
+                operator: '广东共创', capital: '民企 + NGO 背书',
+                revMean: 2.8, revRange: '~ $2.8M',
+                area: 20000, exhibitors: 300, visitors: 40000,
+                theme: '极具话题性与国民度的市井下沉消费狂欢。',
+                categories: '平价飞机杯、情趣内衣清仓、微商保健品、防艾宣讲、模特走秀及内衣展示。',
+                model: '纯粹的国民卖场清库存，极度依赖庞大下沉 C 端的高额门票现金流。', color: '#a855f7'
+            },
+            // 6. Others
+            {
+                id: 'iecie', name: 'IECIE 电子烟展', sector: 'Other Subcultures', subSector: '电子烟与雾化',
+                operator: '深圳博闻创意 (被购前)', capital: '外资巨头 (Informa)',
+                revMean: 21.1, revRange: '> $21M (Peak)',
+                area: 100000, exhibitors: 2000, visitors: 80000,
+                theme: '实体尼古丁成瘾代工产业的全球交易引擎。',
+                categories: '电子烟代工厂(OEM/ODM)、烟油供应链、陶瓷雾化芯技术、一次性电子烟出海爆款。',
+                model: '依靠中国占全球90%产能的绝对垄断，疯狂收割全球 B2B 展商特装费。', color: '#64748b'
+            },
+            {
+                id: 'sneaker', name: 'Sneaker Con / Innersect', sector: 'Other Subcultures', subSector: '潮流球鞋与街头文化',
+                operator: '尚晋国际 等', capital: '民营企业/合资',
+                revMean: 10.6, revRange: '$7M - $14M',
+                area: 30000, exhibitors: 100, visitors: 50000,
+                theme: '身份焦虑与二级市场暴利炒作的实体交易场。',
+                categories: '全球限量版潮鞋(Nike/AJ/Yeezy)交易区、街头潮牌首发、独立设计师主理人摊位、球鞋鉴定与洗护。',
+                model: '限量鞋款发售佣金抽水 + 极强粘性的黄牛与散户门票 + 运动巨头特装。', color: '#64748b'
+            },
+            {
+                id: 'whisky', name: 'Whisky L! (威士忌展)', sector: 'Other Subcultures', subSector: '高端烈酒与洋酒',
+                operator: '极樽文化 (CWS)', capital: '民营企业',
+                revMean: 9.2, revRange: '$7M - $11.3M',
+                area: 20000, exhibitors: 100, visitors: 40000,
+                theme: '酒精成瘾与高净值圈层身份认同的品鉴盛宴。',
+                categories: '全球头部洋酒集团(LVMH/帝亚吉欧/保乐力加)旗下全线产品、独立装瓶商(IB)、限量版单一麦芽威士忌。',
+                model: '极高溢价的千元 VIP 门票 + 烈酒巨头天价特装费 + 现场限量版“一瓶难求”的抽成。', color: '#64748b'
+            },
+            {
+                id: 'coffee', name: '陆家嘴咖啡文化节', sector: 'Other Subcultures', subSector: '精品咖啡与新茶饮',
+                operator: '上海有岸文化传播', capital: '轻资产民营企业',
+                revMean: 7.0, revRange: '$5.6M - $8.5M',
+                area: 30000, exhibitors: 250, visitors: 100000,
+                theme: '合法咖啡因成瘾与都市白领社交货币的狂欢。',
+                categories: '国内外数百家精品独立咖啡馆快闪店、头部燕麦奶/糖浆供应商、高端意式半自动咖啡机 B2B 展示。',
+                model: '零展馆租赁成本，依靠品牌入场费与地标级巨头千万级总冠名。', color: '#64748b'
+            },
+            {
+                id: 'hanfu', name: '华裳九州 (汉服展)', sector: 'Other Subcultures', subSector: '汉服与三坑文化',
+                operator: '杭州星尚文化', capital: '民营企业',
+                revMean: 4.2, revRange: '$2.8M - $5.6M',
+                area: 25000, exhibitors: 200, visitors: 50000,
+                theme: 'Z世代“三坑少女”的服饰攀比与文化大秀。',
+                categories: '高端明制/宋制汉服大厂、JK制服、Lolita洋装、非遗配饰首饰及大型华服时装走秀发布会。',
+                model: '强烈的“时装周”属性：赚取头部服饰品牌高额走秀坑位费、展位费及重度粉丝门票。', color: '#64748b'
+            },
+            {
+                id: 'script', name: '全国剧本杀行业展', sector: 'Other Subcultures', subSector: '沉浸式娱乐与内容交易',
+                operator: '黑探有品 / 剧游网', capital: '民营线上交易平台',
+                revMean: 3.2, revRange: '$2.1M - $4.2M',
+                area: 10000, exhibitors: 100, visitors: 10000,
+                theme: '剧本杀店老板的线下内容交易“黑市”。',
+                categories: '剧本发行工作室“城限本/独家本”试车与交易、线下沉浸式门店软装道具供应商、VR剧本杀硬件。',
+                model: '纯 B2B 版权分发：主办方赚取高额的交易抽水及工作室发行的“首发上车费”。', color: '#64748b'
+            }
+        ];
+
+        const sectorInfo = {
+            'Pan-ACG': { 
+                title: 'Pan-ACG & Anime', 
+                desc: 'The most dominant dopamine consumption engine for the younger generation. Extremely high IP loyalty, social addiction, and astonishing traffic density.',
+                icon: '🎮'
+            },
+            'Outdoor': { 
+                title: 'Outdoor & Camping', 
+                desc: 'The "urban escape addiction" and "gear competition" of the middle class. Huge gap in ARPU, from $150 jackets to $150,000 luxury RVs.',
+                icon: '⛺'
+            },
+            'Pet Economy': { 
+                title: 'Pet Economy', 
+                desc: 'The only sector exploding against the economic downturn cycle. "Emotional companionship addiction" with ultra-high FMCG-level repurchase rates.',
+                icon: '🐾'
+            },
+            'Dental': { 
+                title: 'Dental & Medical', 
+                desc: 'High-ARPU, high-repurchase medical vertical. High commercial value relying on premieres of top global medical devices and professional dentist CME.',
+                icon: '🦷'
+            },
+            'Adult Health': { 
+                title: 'Adult & Wellness', 
+                desc: 'High margin, hormone economy, and strong export OEM dividends. From cross-border hardcore supply chains to domestic youth-oriented trendy brands.',
+                icon: '❤️'
+            },
+            'Other Subcultures': { 
+                title: 'Other Subcultures', 
+                desc: 'Crossing traditional consumption boundaries, deeply rooted in specific high-net-worth crowds (alcohol, sneakers, LARP, apparel) as hidden highly profitable assets.',
+                icon: '💎'
+            }
+        };
+
+        // --- APP INITIALIZATION ---
+
+        function initApp() {
+            renderKPIs();
+            renderScatterPlot();
+            renderRevenueChart();
+            renderSectorTabs('Pan-ACG'); // Default tab
+            
+            // Modal click outside to close
+            document.getElementById('targetModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeModal();
+                }
+            });
+        }
+
+        // --- RENDER KPI CARDS ---
+        function renderKPIs() {
+            document.getElementById('totalTargets').textContent = targets.length;
+            
+            const totalRev = targets.reduce((acc, t) => acc + t.revMean, 0);
+            document.getElementById('totalRevenue').textContent = `$${totalRev.toFixed(1)} M`;
+            
+            const totalVis = targets.reduce((acc, t) => acc + t.visitors, 0);
+            document.getElementById('totalVisitors').textContent = `${(totalVis / 1000000).toFixed(2)} M`;
+            
+            const avg = totalRev / targets.length;
+            document.getElementById('avgRevenue').textContent = `$${avg.toFixed(1)} M`;
+        }
+
+        // --- RENDER SCATTER PLOT (Plotly) ---
+        function renderScatterPlot() {
+            const xAxisVal = document.querySelector('input[name="xaxis"]:checked').value;
+            const data = [];
+            const sectors = [...new Set(targets.map(t => t.sector))];
+
+            let xTitle;
+            if (xAxisVal === 'area') {
+                xTitle = 'Exhibition Area (sqm)';
+            } else if (xAxisVal === 'exhibitors') {
+                xTitle = 'Exhibitors';
+            } else {
+                xTitle = 'Visitors';
+            }
+
+            sectors.forEach(sec => {
+                const sectorTargets = targets.filter(t => t.sector === sec);
+                
+                let xData;
+                if (xAxisVal === 'area') {
+                    xData = sectorTargets.map(t => t.area);
+                } else if (xAxisVal === 'exhibitors') {
+                    xData = sectorTargets.map(t => t.exhibitors);
+                } else {
+                    xData = sectorTargets.map(t => t.visitors);
+                }
+
+                data.push({
+                    x: xData,
+                    y: sectorTargets.map(t => t.revMean),
+                    text: sectorTargets.map(t => `${t.name}<br>Area: ${t.area.toLocaleString()} m²<br>Exhibitors: ${t.exhibitors}<br>Visitors: ${t.visitors.toLocaleString()}`),
+                    mode: 'markers',
+                    name: sectorInfo[sec] ? sectorInfo[sec].title : sec,
+                    marker: {
+                        size: sectorTargets.map(t => Math.sqrt(t.area) / 10), // Scaled bubble size
+                        sizemode: 'diameter',
+                        opacity: 0.7,
+                        line: { width: 1 }
+                    }
+                });
+            });
+
+            const layout = {
+                title: false,
+                xaxis: { title: xTitle, gridcolor: '#f3f4f6' },
+                yaxis: { title: 'Est. Single-Show Revenue (USD Millions)', gridcolor: '#f3f4f6' },
+                hovermode: 'closest',
+                showlegend: true,
+                legend: { 
+                    orientation: 'h', 
+                    y: -0.3, 
+                    x: 0.5, 
+                    xanchor: 'center' 
+                },
+                margin: { l: 50, r: 20, t: 20, b: 100 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)'
+            };
+
+            const config = { responsive: true, displayModeBar: false };
+            Plotly.newPlot('scatterPlot', data, layout, config);
+        }
+
+        // Expose update function to global scope for radio buttons
+        window.updateScatterPlot = renderScatterPlot;
+
+        // --- RENDER REVENUE CHART (Chart.js) ---
+        function renderRevenueChart() {
+            const sortedTargets = [...targets].sort((a, b) => b.revMean - a.revMean).slice(0, 15); // Top 15
+            
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedTargets.map(t => t.name),
+                    datasets: [{
+                        label: 'Est. Revenue (USD Millions)',
+                        data: sortedTargets.map(t => t.revMean),
+                        backgroundColor: sortedTargets.map(t => t.color),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const t = sortedTargets[context.dataIndex];
+                                    return `Est: ${t.revRange}`;
+                                },
+                                afterLabel: function(context) {
+                                    const t = sortedTargets[context.dataIndex];
+                                    return `Operator: ${t.operator}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            grid: { display: false },
+                            title: { display: true, text: 'USD Millions' }
+                        },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // --- SECTOR TABS LOGIC ---
+        function renderSectorTabs(activeSector) {
+            const container = document.getElementById('sectorTabs');
+            const contentDiv = document.getElementById('sectorContent');
+            
+            // Render Tabs
+            const sectors = ['Pan-ACG', 'Outdoor', 'Pet Economy', 'Dental', 'Adult Health', 'Other Subcultures'];
+            container.innerHTML = sectors.map(sec => `
+                <button 
+                    onclick="renderSectorTabs('${sec}')"
+                    class="pb-2 text-sm font-medium transition-colors duration-200 ${sec === activeSector ? 'tab-active' : 'tab-inactive'}"
+                >
+                    ${sectorInfo[sec].icon} ${sectorInfo[sec].title}
+                </button>
+            `).join('');
+
+            // Render Info Header
+            const info = sectorInfo[activeSector];
+            let html = `
+                <div class="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-900">
+                    <h4 class="font-bold flex items-center gap-2 text-lg mb-1">${info.icon} Core Logic: ${info.title}</h4>
+                    <p class="text-sm text-blue-800">${info.desc}</p>
+                </div>
+            `;
+
+            // Render Cards
+            const sectorTargets = targets.filter(t => t.sector === activeSector);
+            
+            html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">`;
+            
+            sectorTargets.forEach(t => {
+                html += `
+                    <div onclick="openModal('${t.id}')" class="bg-white rounded-xl card-shadow p-5 border-t-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between" style="border-color: ${t.color}">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h5 class="text-lg font-bold text-gray-800 leading-tight">${t.name}</h5>
+                            </div>
+                            <span class="text-sm text-blue-700 font-bold mb-4 block px-3 py-1.5 bg-blue-100 rounded-md inline-block">Theme / 主题: ${t.subSector}</span>
+                            
+                            <div class="mb-4">
+                                <div class="text-2xl font-bold text-gray-900 mb-1">${t.revRange}</div>
+                                <div class="text-xs text-gray-400 uppercase font-semibold">Est. Single-Show Revenue (USD)</div>
+                            </div>
+
+                            <div class="space-y-2 mb-4 text-sm text-gray-600">
+                                <div class="flex justify-between border-b border-gray-50 pb-1">
+                                    <span>Area:</span>
+                                    <span class="font-medium">${t.area.toLocaleString()} m²</span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-50 pb-1">
+                                    <span>Exhibitors:</span>
+                                    <span class="font-medium">${t.exhibitors.toLocaleString()}</span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-50 pb-1">
+                                    <span>Visitors:</span>
+                                    <span class="font-medium">${(t.visitors/1000).toFixed(0)}k</span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-50 pb-1">
+                                    <span>Owner / 操盘方:</span>
+                                    <span class="font-medium truncate w-24 text-right" title="${t.operator}">${t.operator}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-xs font-bold px-2 py-1.5 rounded bg-slate-800 text-white text-center flex items-center justify-center gap-1 mt-auto">
+                            <span>View Details</span>
+                            <span>&rarr;</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            contentDiv.innerHTML = html;
+        }
+
+        // --- MODAL LOGIC ---
+        function openModal(id) {
+            const t = targets.find(target => target.id === id);
+            if (!t) return;
+
+            // Populate Data
+            document.getElementById('modalName').textContent = t.name;
+            document.getElementById('modalSubSector').textContent = `Theme / 主题: ${t.subSector} (${t.sector})`;
+            document.getElementById('modalOperator').textContent = `🏢 Owner / 操盘方: ${t.operator}`;
+            document.getElementById('modalCapital').textContent = `💰 Capital / 资本属性: ${t.capital}`;
+            
+            document.getElementById('modalRevMean').textContent = `$${t.revMean} M`;
+            document.getElementById('modalRevRange').textContent = `Est. Range: ${t.revRange}`;
+            
+            document.getElementById('modalArea').textContent = `${t.area.toLocaleString()} sqm`;
+            document.getElementById('modalVisitors').textContent = `${t.visitors.toLocaleString()} visitors`;
+            document.getElementById('modalExhibitors').textContent = `${t.exhibitors.toLocaleString()} exhibitors`;
+            
+            document.getElementById('modalTheme').textContent = t.theme;
+            document.getElementById('modalCategories').textContent = t.categories;
+            document.getElementById('modalModel').textContent = t.model;
+
+            // Show Modal with Animation
+            const modal = document.getElementById('targetModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex', 'modal-enter');
+            content.classList.add('modal-content-enter');
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('targetModal');
+            const content = document.getElementById('modalContent');
+            
+            modal.classList.remove('modal-enter');
+            content.classList.remove('modal-content-enter');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            
+            // Restore body scroll
+            document.body.style.overflow = 'auto';
+        }
+
+        // --- UTILS ---
+        function scrollToSection(id) {
+            const offset = 80; // Offset for sticky header
+            const element = document.getElementById(id);
+            const bodyRect = document.body.getBoundingClientRect().top;
+            const elementRect = element.getBoundingClientRect().top;
+            const elementPosition = elementRect - bodyRect;
+            const offsetPosition = elementPosition - offset;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
